@@ -1,4 +1,4 @@
-package com.example.timer_quiz.ui.theme
+package com.example.timer_quiz.presentation.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
