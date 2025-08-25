@@ -10,7 +10,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.timer_quiz.presentation.ui.components.FlagTitleText
@@ -116,8 +119,14 @@ fun ScoreScreen(
                             .padding(horizontal = 32.dp)
                     ) {
                         Text(
-                            text = "SCORE: $score/15",
-                            color = FlagsColors.OrangePrimary,
+                            text = buildAnnotatedString {
+                                withStyle(style = SpanStyle(color = FlagsColors.OrangePrimary)) {
+                                    append("SCORE: ")
+                                }
+                                withStyle(style = SpanStyle(color = FlagsColors.TextPrimary)) {
+                                    append("$score/15")
+                                }
+                            },
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
