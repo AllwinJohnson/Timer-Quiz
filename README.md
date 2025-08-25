@@ -4,7 +4,7 @@ A timer-based flags quiz application built with Android Jetpack Compose, followi
 
 ### App Preview
 
-[Watch Full Demo Video](timer-quiz.mp4)
+[Watch Full Demo Video]([timer-quiz.mp4](https://github.com/AllwinJohnson/Timer-Quiz/blob/master/screen/timer-quiz.mp4))
 
 ### Screenshots
 <p align="center">
