@@ -37,7 +37,7 @@ fun GameOverScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(FlagsColors.CardBackground)
+            .background(FlagsColors.BackgroundWhite)
     ) {
         // Orange header bar
         Box(
@@ -61,7 +61,7 @@ fun GameOverScreen(
                         color = Color.Black,
                         shape = RoundedCornerShape(FlagsDimens.CornerRadius)
                     ),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = FlagsColors.CardBackground),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 shape = RoundedCornerShape(FlagsDimens.CornerRadius)
             ) {
