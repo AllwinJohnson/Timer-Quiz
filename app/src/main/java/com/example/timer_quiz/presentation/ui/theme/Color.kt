@@ -10,7 +10,7 @@ object FlagsColors {
     val OrangeDark = Color(0xFFE55537)
 
     // Background Colors
-    val BackgroundWhite = Color(0xFFFAFAFA)
+    val BackgroundWhite = Color(0xFFFFFFFF)
     val BackgroundGray = Color(0xFFF5F5F5)
 
     // Text Colors
@@ -37,4 +37,9 @@ object FlagsColors {
     val BorderLight = Color(0xFFE0E0E0)
     val BorderMedium = Color(0xFFCCCCCC)
     val BorderDark = Color(0xFF999999)
+
+    //    Card colors
+    val CardBackground = Color(0xFFF4F4F4)
+
+
 }

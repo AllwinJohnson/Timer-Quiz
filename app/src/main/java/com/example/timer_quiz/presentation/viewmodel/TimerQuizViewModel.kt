@@ -22,15 +22,17 @@ class TimerQuizViewModel(
     private val timerUseCases: TimerUseCases
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(FlagsChallengeState())
-    val uiState: StateFlow<FlagsChallengeState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(TimerQuizState())
+    val uiState: StateFlow<TimerQuizState> = _uiState.asStateFlow()
 
     private val _timerState = MutableStateFlow(TimerState())
     val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
 
     private var questionTimerJob: Job? = null
-    private var breakTimerJob: Job? = null
+    private var gameOverTimerJob: Job? = null
     private var questionStartTime: Long = 0
+    private var isGameLoaded = false
+    private var navigationInProgress = false
 
     init {
         loadGameSession()
@@ -38,25 +40,31 @@ class TimerQuizViewModel(
 
     private fun loadGameSession() {
         viewModelScope.launch {
+            delay(150)
+
             gameUseCases.getGameSession.observeGameSession().collect { gameSession ->
-                if (gameSession != null) {
+                if (gameSession != null && !navigationInProgress) {
+                    val newCurrentQuestion = gameSession.getCurrentQuestion()
+
                     _uiState.value = _uiState.value.copy(
                         gameSession = gameSession,
-                        currentQuestion = gameSession.getCurrentQuestion(),
-                        questionNumber = gameSession.currentQuestionIndex + 1
+                        currentQuestion = newCurrentQuestion
                     )
 
                     when (gameSession.gameState) {
                         GameState.IN_PROGRESS -> {
-                            if (!_uiState.value.showingResult && !_uiState.value.showingBreak) {
-                                startQuestionTimer()
+                            if (!isGameLoaded && newCurrentQuestion != null) {
+                                isGameLoaded = true
+                                delay(100)
+                                if (!_uiState.value.showingResult) {
+                                    startQuestionTimer()
+                                }
                             }
                         }
                         GameState.COMPLETED -> {
-                            _uiState.value = _uiState.value.copy(
-                                showGameOver = true,
-                                finalScore = gameSession.getCorrectAnswersCount()
-                            )
+                            if (!_uiState.value.showGameOver) {
+                                handleGameCompletion(gameSession)
+                            }
                         }
                         else -> {}
                     }
@@ -70,40 +78,37 @@ class TimerQuizViewModel(
         questionTimerJob?.cancel()
 
         questionTimerJob = viewModelScope.launch {
-            timerUseCases.getTimerState.startQuestionTimer(30).collect { timerState ->
-                _timerState.value = timerState
-
-                if (!timerState.isRunning && timerState.remainingTime == 0) {
-                    // Time up - submit no answer
-                    submitAnswer(null)
-                }
+            var remainingTime = 30
+            while (remainingTime > 0 && !navigationInProgress) {
+                _timerState.value = _timerState.value.copy(
+                    remainingTime = remainingTime,
+                    isRunning = true
+                )
+                delay(1000L)
+                remainingTime--
             }
-        }
-    }
 
-    private fun startBreakTimer() {
-        _uiState.value = _uiState.value.copy(showingBreak = true)
-        breakTimerJob?.cancel()
+            if (!navigationInProgress) {
+                _timerState.value = _timerState.value.copy(
+                    remainingTime = 0,
+                    isRunning = false
+                )
 
-        breakTimerJob = viewModelScope.launch {
-            timerUseCases.getTimerState.startBreakTimer(10).collect { timerState ->
-                _timerState.value = timerState
-
-                if (!timerState.isRunning && timerState.remainingTime == 0) {
-                    moveToNextQuestion()
-                }
+                submitAnswer(null)
             }
         }
     }
 
     fun selectAnswer(countryId: Int) {
         val currentState = _uiState.value
-        if (currentState.selectedAnswer == null && !currentState.showingResult) {
+        if (currentState.selectedAnswer == null && !currentState.showingResult && !navigationInProgress) {
             _uiState.value = currentState.copy(selectedAnswer = countryId)
 
             viewModelScope.launch {
-                delay(300) // Brief delay to show selection
-                submitAnswer(countryId)
+                delay(300)
+                if (!navigationInProgress) {
+                    submitAnswer(countryId)
+                }
             }
         }
     }
@@ -116,7 +121,7 @@ class TimerQuizViewModel(
             val gameSession = currentState.gameSession
             val currentQuestion = currentState.currentQuestion
 
-            if (gameSession != null && currentQuestion != null) {
+            if (gameSession != null && currentQuestion != null && !navigationInProgress) {
                 val timeSpent = ((System.currentTimeMillis() - questionStartTime) / 1000).toInt()
                 val isCorrect = selectedCountryId == currentQuestion.answerId
 
@@ -128,24 +133,20 @@ class TimerQuizViewModel(
                     timeSpent = timeSpent
                 )
 
-                // Submit answer
                 gameUseCases.submitAnswer(gameSession.currentQuestionIndex, answer)
 
-                // Update UI to show result
                 _uiState.value = _uiState.value.copy(
                     selectedAnswer = selectedCountryId,
                     showingResult = true,
                     isAnswerCorrect = isCorrect
                 )
 
-                // Show result for 3 seconds
                 delay(3000)
 
-                // Check if game is complete
                 if (gameSession.currentQuestionIndex + 1 >= gameSession.totalQuestions) {
                     completeGame()
                 } else {
-                    startBreakTimer()
+                    moveToNextQuestion()
                 }
             }
         }
@@ -153,16 +154,18 @@ class TimerQuizViewModel(
 
     private fun moveToNextQuestion() {
         viewModelScope.launch {
-            gameUseCases.nextQuestion()
+            if (!navigationInProgress) {
+                gameUseCases.nextQuestion()
 
-            _uiState.value = _uiState.value.copy(
-                selectedAnswer = null,
-                showingResult = false,
-                showingBreak = false,
-                isAnswerCorrect = false
-            )
+                _uiState.value = _uiState.value.copy(
+                    selectedAnswer = null,
+                    showingResult = false,
+                    isAnswerCorrect = false
+                )
 
-            startQuestionTimer()
+                delay(100)
+                startQuestionTimer()
+            }
         }
     }
 
@@ -173,66 +176,105 @@ class TimerQuizViewModel(
             val finalSession = gameUseCases.getGameSession.getCurrentSession()
             val score = finalSession?.getCorrectAnswersCount() ?: 0
 
+            // Just trigger navigation to game over screen with score
             _uiState.value = _uiState.value.copy(
                 showGameOver = true,
-                finalScore = score,
-                showingResult = false,
-                showingBreak = false
+                finalScore = score
             )
+        }
+    }
+
+    private fun handleGameCompletion(gameSession: GameSession) {
+        val score = gameSession.getCorrectAnswersCount()
+
+        _uiState.value = _uiState.value.copy(
+            showGameOver = true,
+            finalScore = score,
+            showingResult = false,
+            showingScore = false
+        )
+
+        startGameOverSequence()
+    }
+
+    private fun startGameOverSequence() {
+        gameOverTimerJob?.cancel()
+        gameOverTimerJob = viewModelScope.launch {
+            // Phase 1: Show "GAME OVER" with 10-second countdown
+            var remainingTime = 10
+            while (remainingTime > 0 && !navigationInProgress) {
+                _timerState.value = _timerState.value.copy(
+                    remainingTime = remainingTime,
+                    isRunning = true
+                )
+                delay(1000L)
+                remainingTime--
+            }
+
+            if (!navigationInProgress) {
+                _timerState.value = _timerState.value.copy(
+                    remainingTime = 0,
+                    isRunning = false
+                )
+
+                // Phase 2: Show score page
+                _uiState.value = _uiState.value.copy(showingScore = true)
+
+                remainingTime = 10
+                while (remainingTime > 0 && !navigationInProgress) {
+                    _timerState.value = _timerState.value.copy(
+                        remainingTime = remainingTime,
+                        isRunning = true
+                    )
+                    delay(1000L)
+                    remainingTime--
+                }
+
+                if (!navigationInProgress) {
+                    _timerState.value = _timerState.value.copy(
+                        remainingTime = 0,
+                        isRunning = false
+                    )
+
+                    // Phase 3: Navigate back to scheduler
+                    navigationInProgress = true
+                    delay(200) // Small delay before navigation
+                    resetGame()
+                }
+            }
         }
     }
 
     fun resetGame() {
         viewModelScope.launch {
+            navigationInProgress = true
             questionTimerJob?.cancel()
-            breakTimerJob?.cancel()
+            gameOverTimerJob?.cancel()
 
             gameUseCases.resetGame()
+            delay(100)
 
-            _uiState.value = FlagsChallengeState()
+            _uiState.value = TimerQuizState()
             _timerState.value = TimerState()
-        }
-    }
-
-    // Handle app lifecycle
-    fun onAppPause() {
-        // Timer continues in background - no need to cancel
-        val currentSession = _uiState.value.gameSession
-        if (currentSession != null && currentSession.gameState == GameState.IN_PROGRESS) {
-            viewModelScope.launch {
-                gameUseCases.updateGameState(GameState.PAUSED)
-            }
-        }
-    }
-
-    fun onAppResume() {
-        val currentSession = _uiState.value.gameSession
-        if (currentSession != null && currentSession.gameState == GameState.PAUSED) {
-            viewModelScope.launch {
-                gameUseCases.updateGameState(GameState.IN_PROGRESS)
-                // Restart timer if needed
-                if (!_uiState.value.showingResult && !_uiState.value.showingBreak) {
-                    startQuestionTimer()
-                }
-            }
+            isGameLoaded = false
+            navigationInProgress = false
         }
     }
 
     override fun onCleared() {
         super.onCleared()
         questionTimerJob?.cancel()
-        breakTimerJob?.cancel()
+        gameOverTimerJob?.cancel()
     }
 }
 
-data class FlagsChallengeState(
+data class TimerQuizState(
     val gameSession: GameSession? = null,
     val currentQuestion: Question? = null,
-    val questionNumber: Int = 1,
     val selectedAnswer: Int? = null,
     val showingResult: Boolean = false,
-    val showingBreak: Boolean = false,
     val showGameOver: Boolean = false,
+    val showingScore: Boolean = false,
     val isAnswerCorrect: Boolean = false,
     val finalScore: Int = 0,
     val error: String? = null

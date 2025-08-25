@@ -30,14 +30,16 @@ import org.koin.androidx.compose.koinViewModel
 @SuppressLint("DefaultLocale")
 @Composable
 fun TimerQuizScreen(
-    onGameComplete: () -> Unit,
+    onGameComplete: (Int) -> Unit,
     viewModel: TimerQuizViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val timerState by viewModel.timerState.collectAsState()
 
     LaunchedEffect(uiState.showGameOver) {
-        if (uiState.showGameOver) onGameComplete()
+        if (uiState.showGameOver) {
+            onGameComplete(uiState.finalScore)
+        }
     }
 
     Column(
@@ -45,7 +47,7 @@ fun TimerQuizScreen(
             .fillMaxSize()
             .background(FlagsColors.BackgroundWhite)
     ) {
-        // Orange top strip like reference
+        // Orange top strip
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -67,7 +69,7 @@ fun TimerQuizScreen(
                         color = Color.Black,
                         shape = RoundedCornerShape(FlagsDimens.CornerRadius)
                     ),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = FlagsColors.CardBackground),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 shape = RoundedCornerShape(FlagsDimens.CornerRadius)
             ) {
@@ -210,7 +212,7 @@ fun TimerQuizScreen(
                                                 onClick = { viewModel.selectAnswer(country.id) },
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .height(48.dp)      // slimmer like the mock
+                                                    .height(48.dp)
                                             )
                                         }
                                     }

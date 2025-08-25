@@ -1,6 +1,7 @@
 package com.example.timer_quiz.presentation.viewmodel
 
 
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.timer_quiz.domain.model.GameSession
@@ -29,16 +30,18 @@ class TimerSchedulerViewModel(
 
     private var countdownJob: Job? = null
     private var monitoringJob: Job? = null
+    private var gameCreationInProgress = false
 
     init {
-        // Check if there's an existing game session
         checkExistingSession()
     }
 
     private fun checkExistingSession() {
         viewModelScope.launch {
             val existingSession = gameUseCases.getGameSession.getCurrentSession()
-            if (existingSession != null && existingSession.gameState != GameState.COMPLETED) {
+            if (existingSession != null && existingSession.gameState == GameState.IN_PROGRESS) {
+                // Delay navigation to prevent flickering
+                delay(100)
                 _uiState.value = _uiState.value.copy(gameStarted = true)
             }
         }
@@ -57,7 +60,7 @@ class TimerSchedulerViewModel(
 
     fun saveScheduledTime() {
         val currentState = _uiState.value
-        if (currentState.isTimeValid) {
+        if (currentState.isTimeValid && !gameCreationInProgress) {
             viewModelScope.launch {
                 try {
                     val scheduledTime = System.currentTimeMillis() + (currentState.totalSelectedSeconds * 1000L)
@@ -82,7 +85,7 @@ class TimerSchedulerViewModel(
     private fun startCountdownMonitoring() {
         monitoringJob?.cancel()
         monitoringJob = viewModelScope.launch {
-            while (_uiState.value.isScheduled && !_uiState.value.gameStarted) {
+            while (_uiState.value.isScheduled && !_uiState.value.gameStarted && !gameCreationInProgress) {
                 val currentTime = System.currentTimeMillis()
                 val scheduledTime = _uiState.value.scheduledTime
 
@@ -116,19 +119,35 @@ class TimerSchedulerViewModel(
 
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
-            timerUseCases.startCountdown(10).collect { timerState ->
-                _timerState.value = timerState
-
-                if (!timerState.isRunning && timerState.remainingTime == 0) {
-                    startGame()
-                }
+            var remainingTime = 20
+            while (remainingTime > 0) {
+                _timerState.value = _timerState.value.copy(
+                    remainingTime = remainingTime,
+                    isRunning = true
+                )
+                delay(1000L)
+                remainingTime--
             }
+
+            _timerState.value = _timerState.value.copy(
+                remainingTime = 0,
+                isRunning = false
+            )
+
+            startGame()
         }
     }
 
     private fun startGame() {
+        if (gameCreationInProgress) return
+
+        gameCreationInProgress = true
         viewModelScope.launch {
             try {
+                // First clear any existing game
+                gameUseCases.resetGame()
+                delay(100) // Small delay to ensure cleanup
+
                 val questionsResult = gameUseCases.getQuestions()
 
                 if (questionsResult.isSuccess) {
@@ -142,6 +161,9 @@ class TimerSchedulerViewModel(
                     )
 
                     gameUseCases.saveGameSession(gameSession)
+
+                    // Small delay before navigation to prevent flickering
+                    delay(200)
 
                     _uiState.value = _uiState.value.copy(
                         isScheduled = false,
@@ -158,6 +180,8 @@ class TimerSchedulerViewModel(
                 _uiState.value = _uiState.value.copy(
                     error = "Error starting game: ${e.message}"
                 )
+            } finally {
+                gameCreationInProgress = false
             }
         }
     }
@@ -166,8 +190,10 @@ class TimerSchedulerViewModel(
         viewModelScope.launch {
             countdownJob?.cancel()
             monitoringJob?.cancel()
+            gameCreationInProgress = false
 
             gameUseCases.resetGame()
+            delay(100) // Ensure cleanup completes
 
             _uiState.value = TimerSchedulerState()
             _timerState.value = TimerState()
@@ -184,7 +210,6 @@ class TimerSchedulerViewModel(
         monitoringJob?.cancel()
     }
 }
-
 data class TimerSchedulerState(
     val selectedHours: Int = 0,
     val selectedMinutes: Int = 0,

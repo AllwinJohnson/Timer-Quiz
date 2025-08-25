@@ -74,7 +74,6 @@ fun CountryOptionButton(
         }
 
         if (showCorrect || showWrong) {
-            Spacer(Modifier.height(4.dp))
             Text(
                 text = if (showCorrect) "CORRECT" else "WRONG",
                 color = if (showCorrect) success else danger,

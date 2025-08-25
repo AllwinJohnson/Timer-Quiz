@@ -99,7 +99,7 @@ private fun TimerSetupContent(
                 color = Color.Black,
                 shape = RoundedCornerShape(FlagsDimens.CornerRadius)
             ),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = FlagsColors.CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         shape = RoundedCornerShape(FlagsDimens.CornerRadius)
     ) {
@@ -469,12 +469,11 @@ private fun CountdownContent(remainingTime: Int) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp) // same height as timer box for alignment
+                    .height(52.dp)
             ) {
-                // Timer on the left
                 Box(
                     modifier = Modifier
-                        .align(Alignment.CenterStart) // stick to left
+                        .align(Alignment.CenterStart)
                         .width(80.dp)
                         .height(52.dp)
                         .background(
