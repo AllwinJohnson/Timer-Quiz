@@ -18,7 +18,7 @@ A timer-based flags quiz application built with Android Jetpack Compose, followi
 </p>
 
 **Download Links:**
-- [APK Download](https://github.com/AllwinJohnson/Timer-Quiz/blob/master/app/build/outputs/apk/debug/app-debug.apk) (Prefering to build an updated verion from project)
+- [APK Download](https://github.com/AllwinJohnson/Timer-Quiz/blob/master/app/build/outputs/apk/debug/app-debug.apk) (Prefering to build an updated version from project)
 
 
 ### Core Functionality
